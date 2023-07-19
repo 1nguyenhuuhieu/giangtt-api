@@ -20,8 +20,6 @@ def create_basic_auth_header(username, password):
     return headers
 
 
-
-
 # Tạo yêu cầu sử dụng phương thức Basic Authentication
 def make_authenticated_request(url, username, password):
     payload = {
