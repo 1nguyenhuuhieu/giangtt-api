@@ -1,5 +1,6 @@
 import requests
 import base64
+import json
 
 # Tạo header Authorization với thông tin xác thực Basic
 def create_basic_auth_header(username, password):
@@ -14,10 +15,46 @@ def create_basic_auth_header(username, password):
 
 # Tạo yêu cầu thanh toán
 def create_checkout_session(payload, username, password):
-
-    print(payload)
-
     url = "https://api-sandbox.tazapay.com/v1/checkout"
     headers = create_basic_auth_header(username, password)
     response = requests.post(url, json=payload, headers=headers)
+
+    response_data = response.text
+    data = json.loads(response_data)
+
+
+    status = data['status']
+    message = data['message']
+    redirect_url = data['data']['redirect_url']
+    txn_no = data['data']['txn_no']
+
+    response = {
+    "status": status,
+    "message": message,
+    "redirect_url": redirect_url,
+    "txn_no": txn_no
+    }
+    return response
+
+# Kiểm tra thông tin thanh toán
+def get_checkout_session(txn_no, username, password):
+    headers = create_basic_auth_header(username, password)
+    base_url = "https://api-sandbox.tazapay.com/v1/checkout/"
+    url = base_url + txn_no
+
+    response = requests.get(url, headers=headers)
+    response_data = response.text
+    data = json.loads(response_data)
+
+    txn_no = data['data']['txn_no']
+    state = data['data']['state']
+    txn_description = data['data']['txn_description']
+    invoice_amount = data['data']['invoice_amount']
+    response = {
+    "txn_no": txn_no,
+    "state": state,
+    "txn_description": txn_description,
+    "invoice_amount": invoice_amount
+    }
+
     return response
