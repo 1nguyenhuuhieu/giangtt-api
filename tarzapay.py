@@ -13,7 +13,7 @@ def create_basic_auth_header(username, password):
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": f"Basic {base64_auth_string}"
+        "authorization": f"Basic {base64_auth_string}"
         }
     return headers
 
