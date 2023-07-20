@@ -11,11 +11,6 @@ Base = declarative_base()
 
 
 
-# Create the database tables
-Base.metadata.create_all(bind=engine)
-# Create a session to interact with the database
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-session = SessionLocal()
 
 
 # Define the "payment_success" table using the ORM approach
@@ -56,6 +51,14 @@ class User(Base):
     plan_ended_time = Column(DateTime, nullable=True)
     credit = Column(Float, nullable=False, default=1)
     email = Column(String) 
+
+
+# Create the database tables
+Base.metadata.create_all(bind=engine)
+# Create a session to interact with the database
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+session = SessionLocal()
+
 
 # Function to check if txn_no exists in payment_success table
 def is_txn_no_exists(txn_no):
