@@ -43,33 +43,9 @@ class Transaction(BaseModel):
     invoice_amount: float
     txn_description: str
 
-
-
 def verify_api_key(api_key: str = None):
     if api_key is None or api_key not in valid_api_keys:
         raise HTTPException(status_code=401, detail="Invalid API Key")
-
-
-@app.post("/api/create_user/")
-async def create_user(uid_user: str, plan: str, email: str, api_key: str = Depends(verify_api_key)):
-    # Check if the user already exists in the database
-    existing_user = SessionLocal().query(User).filter_by(uid_user=uid_user).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User already exists.")
-
-    # Get the current time
-    current_time = datetime.now()
-
-    # Create a new user object
-    new_user = User(uid_user=uid_user, plan=plan, plan_started_time=str(current_time), 
-                    plan_ended_time=str(current_time), email=email)
-
-    # Add the new user to the database
-    session = SessionLocal()
-    session.add(new_user)
-    session.commit()
-
-    return {"status": "User created successfully.", "user_id": uid_user}
 
 
 @app.post("/api/create_transaction/")
@@ -124,31 +100,104 @@ async def get_checkout(txn_no: str, api_key: str = Depends(verify_api_key)):
 
 
 # Assuming you have already defined the update_credit_and_record_transfer function
+@app.post("/api/create_user/")
+async def create_user(uid_user: str, email: str, api_key: str = Depends(verify_api_key)):
+    # Check if the user already exists in the database
+    existing_user = SessionLocal().query(User).filter_by(uid_user=uid_user).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists.")
 
-@app.post("/api/update_credit/{user_id}")
-async def update_credit(
-    user_id: str,
-    credit_change: float,
-    note: str,
-    api_key: str = Depends(verify_api_key)
-):
-    result = update_credit_and_record_transfer(user_id, credit_change, note)
-    if result:
-        return {"message": "Credit updated and transfer recorded successfully."}
-    else:
-        raise HTTPException(status_code=404, detail="User not found.")
+    # Get the current time
+    current_time = datetime.now()
+    endded_time = current_time + timedelta(days=30)
+    # Create a new user object
+    new_user = User(uid_user=uid_user, plan_started_time=current_time, 
+                    plan_ended_time=endded_time, email=email)
 
+    # Add the new user to the database
+    session = SessionLocal()
+    credit_transfer = CreditTransfer(
+    credit=1,
+    uid_user=uid_user,
+    note="Free 1 credit for sigup",
+    time_created=current_time
+    )
+    session.add(credit_transfer)
+    session.add(new_user)
 
-@app.get("/api/check_credit/{user_id}")
-async def check_credit(user_id: str, api_key: str = Depends(verify_api_key)):
-    # Find the user in the database
+    
+    session.commit()
+
+    return {"status": "User created successfully.", "user_id": uid_user}
+
+@app.get("/api/check_generate/{user_id}/")
+async def check_generate(user_id: str, api_key: str = Depends(verify_api_key)):
+    # Query the user from the database based on the provided uid_user
     user = session.query(User).filter_by(uid_user=user_id).first()
 
     if user:
-        return {"user_id": user_id, "credit": user.credit}
-    else:
-        raise HTTPException(status_code=404, detail="User not found.")
+        # Get the current time
+        current_time = datetime.now()
 
+        # Check if the credit is less than 10 and send alert email
+        if user.credit < 10:
+            email_message = f"Alert: Your credit is low! Current credit: {user.credit}"
+            send_email(user.email, "Credit Alert", email_message)
+            if user.credit <= 0:
+                return {"status": "Credit is not valid."}
+        # Check if the plan end time is in the future
+        if user.plan_ended_time > current_time:
+            return {"status": "Credit and plan are valid."}
+        else:
+            return {"status": "Credit or plan is not valid."}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+@app.get("/api/generate_success/{user_id}/")
+async def generate_success(user_id: str, api_key: str = Depends(verify_api_key)):
+    # Query the user from the database based on the provided uid_user
+    user = session.query(User).filter_by(uid_user=user_id).first()
+
+    if user:
+        # Get the current time
+        current_time = datetime.now()
+
+        # Check if the credit is less than or equal to 0 or the plan end time is in the past
+        if user.credit <= 0 or user.plan_ended_time < current_time:
+            return {"status": "No allow to generate."}
+
+        # If credit is valid, decrement it by 1 and create a new credit transfer record
+        user.credit -= 1
+        credit_transfer = CreditTransfer(
+            credit=-1,
+            uid_user=user_id,
+            note="generate",
+            time_created=current_time
+        )
+        session.add(credit_transfer)
+        session.commit()
+
+        return {"status": "Allow to generate."}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+@app.get("/api/user/{user_id}/")
+async def get_user(user_id: str, api_key: str = Depends(verify_api_key)):
+    # Query the user from the database based on the provided uid_user
+    user = session.query(User).filter_by(uid_user=user_id).first()
+
+    if user:
+        return {
+            "uid_user": user.uid_user,
+            "plan": user.plan,
+            "plan_started_time": user.plan_started_time,
+            "plan_ended_time": user.plan_ended_time,
+            "credit": user.credit
+        }
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+    
 
 @app.get("/api/total_users/")
 async def get_total_users(api_key: str = Depends(verify_api_key)):
@@ -158,8 +207,8 @@ async def get_total_users(api_key: str = Depends(verify_api_key)):
     return {"total_users": total_users}
 
 
-@app.get("/api/get_all_users/")
-async def get_all_users(page: int = Query(1, ge=1), limit: int = Query(10, le=100), api_key: str = Depends(verify_api_key)):
+@app.get("/api/get_users/")
+async def get_users(page: int = Query(1, ge=1), limit: int = Query(10, le=100), api_key: str = Depends(verify_api_key)):
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
@@ -173,6 +222,37 @@ async def get_all_users(page: int = Query(1, ge=1), limit: int = Query(10, le=10
         return {"users": []}
     
 
+@app.get("/api/payment_success/{user_id}/")
+async def get_user_payment_success(
+    user_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, le=100), api_key: str = Depends(verify_api_key)
+):
+    # Calculate the offset based on the page and limit values
+    offset = (page - 1) * limit
+
+    # Query successful payment transactions for the specified user with pagination
+    user_payment_success_list = (
+        session.query(PaymentSuccess)
+        .filter_by(uid_user=user_id)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    if user_payment_success_list:
+        success_list = [
+            {
+                "invoice_amount": payment.invoice_amount,
+                "txn_no": payment.txn_no,
+                "time_created": payment.time_created
+            }
+            for payment in user_payment_success_list
+        ]
+        return {"user_id": user_id, "payment_success_list": success_list}
+    else:
+        return {"user_id": user_id, "payment_success_list": []}
+    
 
 @app.get("/api/total_payment_success/")
 async def get_total_payment_success(api_key: str = Depends(verify_api_key)):
@@ -209,8 +289,9 @@ async def get_payment_success(
         return {"payment_success_list": []}
     
 
-@app.get("/api/payment_success/{user_id}/")
-async def get_user_payment_success(
+
+@app.get("/api/credit_transfer/{user_id}/")
+async def get_user_credit_transfer(
     user_id: str,
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100), api_key: str = Depends(verify_api_key)
@@ -218,28 +299,28 @@ async def get_user_payment_success(
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
-    # Query successful payment transactions for the specified user with pagination
-    user_payment_success_list = (
-        session.query(PaymentSuccess)
+    # Query credit transfers for the specified user with pagination
+    user_credit_transfer_list = (
+        session.query(CreditTransfer)
         .filter_by(uid_user=user_id)
         .offset(offset)
         .limit(limit)
         .all()
     )
 
-    if user_payment_success_list:
-        success_list = [
+    if user_credit_transfer_list:
+        transfer_list = [
             {
-                "invoice_amount": payment.invoice_amount,
-                "txn_no": payment.txn_no,
-                "time_created": payment.time_created
+                "credit": credit_transfer.credit,
+                "note": credit_transfer.note,
+                "time_created": credit_transfer.time_created
             }
-            for payment in user_payment_success_list
+            for credit_transfer in user_credit_transfer_list
         ]
-        return {"user_id": user_id, "payment_success_list": success_list}
+        return {"user_id": user_id, "credit_transfer_list": transfer_list}
     else:
-        return {"user_id": user_id, "payment_success_list": []}
-    
+        return {"user_id": user_id, "credit_transfer_list": []}
+
 
 @app.get("/api/total_credit_transfer/")
 async def get_total_credit_transfer(api_key: str = Depends(verify_api_key)):
@@ -281,97 +362,10 @@ async def get_credit_transfer(
 
 
 
-@app.get("/api/credit_transfer/{user_id}/")
-async def get_user_credit_transfer(
-    user_id: str,
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, le=100), api_key: str = Depends(verify_api_key)
-):
-    # Calculate the offset based on the page and limit values
-    offset = (page - 1) * limit
-
-    # Query credit transfers for the specified user with pagination
-    user_credit_transfer_list = (
-        session.query(CreditTransfer)
-        .filter_by(uid_user=user_id)
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-
-    if user_credit_transfer_list:
-        transfer_list = [
-            {
-                "credit": credit_transfer.credit,
-                "note": credit_transfer.note,
-                "time_created": credit_transfer.time_created
-            }
-            for credit_transfer in user_credit_transfer_list
-        ]
-        return {"user_id": user_id, "credit_transfer_list": transfer_list}
-    else:
-        return {"user_id": user_id, "credit_transfer_list": []}
-
-@app.get("/api/user/{user_id}/")
-async def get_user(user_id: str, api_key: str = Depends(verify_api_key)):
-    # Query the user from the database based on the provided uid_user
-    user = session.query(User).filter_by(uid_user=user_id).first()
-
-    if user:
-        return {
-            "uid_user": user.uid_user,
-            "plan": user.plan,
-            "plan_started_time": user.plan_started_time,
-            "plan_ended_time": user.plan_ended_time,
-            "credit": user.credit
-        }
-    else:
-        raise HTTPException(status_code=404, detail="User not found")
 
 
-@app.get("/api/check_credit_and_send_email/{user_id}/")
-async def check_credit_and_send_email(user_id: str, api_key: str = Depends(verify_api_key)):
-    # Query the user from the database based on the provided uid_user
-    user = session.query(User).filter_by(uid_user=user_id).first()
 
-    if user:
-        # Get the current time
-        current_time = datetime.now()
 
-        # Check if the credit is less than 10 and send alert email
-        if user.credit < 10:
-            email_message = f"Alert: Your credit is low! Current credit: {user.credit}"
-            send_email(user.email, "Credit Alert", email_message)
-            if user.credit <= 0:
-                return {"status": "Credit is not valid."}
-        # Check if the plan end time is in the future
-        if user.plan_ended_time > current_time:
-            return {"status": "Credit and plan are valid."}
-        else:
-            return {"status": "Credit or plan is not valid."}
-    else:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-@app.post("/api/generate_success/{user_id}/")
-async def generate_success(user_id: str, api_key: str = Depends(verify_api_key)):
-    # Query the user from the database based on the provided uid_user
-    user = session.query(User).filter_by(uid_user=user_id).first()
-
-    if user:
-        # Get the current time
-        current_time = datetime.now()
-
-        # Check if the credit is less than or equal to 0
-        if user.credit <= 0 or user.plan_ended_time < current_time:
-            return {"status": "No allow to generate."}
-        else:
-            # Deduct credit by 1
-            user.credit -= 1
-            session.commit()
-
-            return {"status": "Allow to generate success."}
-    else:
-        raise HTTPException(status_code=404, detail="User not found")
 
 #2307-020710
 
