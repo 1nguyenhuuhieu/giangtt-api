@@ -4,11 +4,23 @@ from pydantic import BaseModel, Field
 from fastapi.encoders import jsonable_encoder
 from tarzapay import *
 import json
+from fastapi.middleware.cors import CORSMiddleware
 
 tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
 tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
 
 app = FastAPI()
+
+# Allow all origins for demonstration purposes. Replace "*" with your specific origins.
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Buyer(BaseModel):
     ind_bus_type: str = Field("Individual")
