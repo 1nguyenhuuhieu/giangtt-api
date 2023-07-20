@@ -19,12 +19,7 @@ security = HTTPBasic()
 origins = ["*"]
 
 
-# Sample username and password for demonstration purposes
-fake_users = {
-    "tungnguyen1": {
-        "password": "Pass@123"
-    }
-}
+valid_api_keys = ["ee0e1e35-cdvn-3471-3xbv-ac73611ac1e2"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,21 +44,14 @@ class Transaction(BaseModel):
 
 
 
-def authenticate_user(credentials: HTTPBasicCredentials = Depends(security)):
-    user = fake_users.get(credentials.username)
-    if user is None or user["password"] != credentials.password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
-
+def verify_api_key(api_key: str = None):
+    if api_key is None or api_key not in valid_api_keys:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
 
 @app.post("/transactions/")
 async def create_transaction(
     transaction: Transaction = Body(...),
-    username: str = Depends(authenticate_user)
+    api_key: str = Depends(verify_api_key)
 ):
     # Process the logic to create a transaction and save it to the database
 
@@ -86,7 +74,7 @@ async def create_transaction(
 
 
 @app.get("/checkout/{txn_no}")
-async def get_checkout(txn_no: str, username: str = Depends(authenticate_user)):
+async def get_checkout(txn_no: str, api_key: str = Depends(verify_api_key)):
     # Perform logic to retrieve checkout details based on `txn_no`
     response = get_checkout_session(txn_no, tarzapay_api_Key, tarzapay_secret)
     if response['state'] == 'Payment_Received':
@@ -103,8 +91,8 @@ async def get_checkout(txn_no: str, username: str = Depends(authenticate_user)):
         note = "Payment for Gold Plan subscription"
         handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan, note)
 
-    else:
-        print('df')
     return response
 
-#2307-244437
+#2307-562822
+
+#ee0e1e35-cdvn-3471-3xbv-ac73611ac1e2
