@@ -22,7 +22,6 @@ def create_checkout_session(payload, username, password):
     response_data = response.text
     data = json.loads(response_data)
 
-
     status = data['status']
     message = data['message']
     redirect_url = data['data']['redirect_url']
