@@ -70,14 +70,12 @@ async def create_transaction(
     transaction_json = jsonable_encoder(transaction)
     response = create_checkout_session(transaction_json, tarzapay_api_Key, tarzapay_secret)
 
-
-    # Example usage: Sending the email to a recipient with a beautiful HTML template
     receiver_email = response['email']
     subject = "Guide for Tazapay Transaction"
     payment_link = response['redirect_url']
     # Generate the HTML content with the payment link
     html_content = generate_html_content(payment_link)
-    print('debug')
+    
     # Send the email
     send_html_email(receiver_email, subject, html_content)
 
@@ -95,7 +93,11 @@ async def get_checkout(txn_no: str, username: str = Depends(authenticate_user)):
         txn_no = response['txn_no']
         # Split the txn_description to extract uid_user and plan
         txn_description = response['txn_description']
-        uid_user, aggregated_plan  = txn_description.split(';')
+        try:
+            uid_user, aggregated_plan  = txn_description.split(';')
+        except:
+            uid_user = 'anonymous'
+            aggregated_plan = 'unknown'
 
         invoice_amount = response['invoice_amount']
         note = "Payment for Gold Plan subscription"

@@ -3,7 +3,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 def send_html_email(receiver_email, subject, html_content):
-    print('...')
     # Replace the following variables with your email and password
     sender_email = "1nguyenhuuhieu@gmail.com"
     sender_password = "qlwzbxcnfvceiwfb"
