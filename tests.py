@@ -1,25 +1,35 @@
 import requests
 
-url = "https://api-sandbox.tazapay.com/v1/checkout"
+# Replace these values with your actual API endpoint and credentials if necessary
+api_base_url = "http://localhost:8000"
+username = "tungnguyen1"
+password = "Pass@123"
 
-payload = {
+# Sample data for the transaction
+transaction_data = {
     "buyer": {
         "ind_bus_type": "Individual",
-        "email": "a@string.com",
-        "country": "SG",
-        "first_name": "sg",
-        "last_name": "buyer"
+        "email": "hieu@gmal.com",
+        "country": "US",
+        "first_name": "string",
+        "last_name": "string"
     },
     "invoice_currency": "USD",
     "invoice_amount": 100,
-    "txn_description": "test"
-}
-headers = {
-    "accept": "application/json",
-    "content-type": "application/json",
-    "authorization": "Basic R1NMTDlHREE4NFVSU1M3VFNBMlo6c2FuZGJveF9nUElNZTBJSUl4ZDd4M0hIVkJwVVBraTMyZU5WOEFDODRsQnlZVE5hRDdKRGdHcElNWlJaYTRkVlVtRmxZME04b3REVXlBeEJ3OEFvU0xPYm1rdlpFdEw1QXE3MFU3SVBBZ0tkZE15N2JVN3ZJeDRTV29ra2NWZkk5Q0k0cFdYQg=="
+    "txn_description": "Test Transaction"
 }
 
-response = requests.post(url, json=payload, headers=headers)
+# Send a POST request with Basic Authentication
+response = requests.post(
+    f"{api_base_url}/transactions/",
+    json=transaction_data,
+    auth=(username, password)
+)
 
-print(response.text)
+# Check the response
+if response.status_code == 200:
+    print("Transaction created successfully!")
+    print(response.json())
+else:
+    print(f"Failed to create transaction. Status code: {response.status_code}")
+    print(response.json())
