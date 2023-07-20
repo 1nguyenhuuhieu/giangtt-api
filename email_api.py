@@ -2,10 +2,13 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+
+sender_email = "1nguyenhuuhieu@gmail.com"  # Replace with your sender email address
+sender_password = "qlwzbxcnfvceiwfb"  # Replace with your sender email password
+
+
 def send_html_email(receiver_email, subject, html_content):
-    # Replace the following variables with your email and password
-    sender_email = "1nguyenhuuhieu@gmail.com"
-    sender_password = "qlwzbxcnfvceiwfb"
+
 
     # Create a multipart message and set the headers
     message = MIMEMultipart("alternative")
@@ -63,3 +66,23 @@ def generate_html_content(payment_link):
     </body>
     </html>
     """
+
+
+def send_email(receiver_email, subject, message):
+
+    msg = MIMEText(message)
+    msg["Subject"] = subject
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+
+    try:
+        # Connect to the SMTP server and send the email
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, [receiver_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
