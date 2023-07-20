@@ -51,11 +51,13 @@ def get_checkout_session(txn_no, username, password):
     state = data['data']['state']
     txn_description = data['data']['txn_description']
     invoice_amount = data['data']['invoice_amount']
+    email = data['data']['buyer']['email']
     response = {
     "txn_no": txn_no,
     "state": state,
     "txn_description": txn_description,
-    "invoice_amount": invoice_amount
+    "invoice_amount": invoice_amount,
+    'email': email
     }
 
     return response
