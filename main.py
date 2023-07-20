@@ -7,7 +7,8 @@ from tarzapay import *
 import json
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import*
+from database import *
+from email_api import *
 
 tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
 tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
@@ -69,6 +70,18 @@ async def create_transaction(
     transaction_json = jsonable_encoder(transaction)
     response = create_checkout_session(transaction_json, tarzapay_api_Key, tarzapay_secret)
 
+
+    # Example usage: Sending the email to a recipient with a beautiful HTML template
+    receiver_email = response['email']
+    subject = "Guide for Tazapay Transaction"
+    payment_link = response['redirect_url']
+    # Generate the HTML content with the payment link
+    html_content = generate_html_content(payment_link)
+    print('debug')
+    # Send the email
+    send_html_email(receiver_email, subject, html_content)
+
+
     return {
         "payment": response,
         "transaction": transaction}
@@ -78,17 +91,18 @@ async def create_transaction(
 async def get_checkout(txn_no: str, username: str = Depends(authenticate_user)):
     # Perform logic to retrieve checkout details based on `txn_no`
     response = get_checkout_session(txn_no, tarzapay_api_Key, tarzapay_secret)
-    print('dfsd')
     if response['state'] == 'Payment_Received':
-        print(response)
         txn_no = response['txn_no']
-        uid_user = response['txn_description']
+        # Split the txn_description to extract uid_user and plan
+        txn_description = response['txn_description']
+        uid_user, aggregated_plan  = txn_description.split(';')
+
         invoice_amount = response['invoice_amount']
-        note = "Payment for Premium plan"
-        handle_payment_success(uid_user, invoice_amount, txn_no, note)
+        note = "Payment for Gold Plan subscription"
+        handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan, note)
 
     else:
         print('df')
     return response
 
-#2307-902801
+#2307-244437

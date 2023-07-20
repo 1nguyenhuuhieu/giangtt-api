@@ -117,48 +117,57 @@ def update_credit_transfer():
     session.add(new_credit_transfer)
     session.commit()
 
-session.close()
 
 
 
-# Function to handle payment success
-def handle_payment_success(uid_user, invoice_amount, txn_no, note=None):
-    # Update the payment_success table
-    new_payment_success = PaymentSuccess(
-        invoice_amount=invoice_amount,
-        uid_user=uid_user,
-        txn_no=txn_no,
-    )
-    session.add(new_payment_success)
+# Function to check if txn_no exists in payment_success table
+def is_txn_no_exists(txn_no):
+    return session.query(PaymentSuccess).filter_by(txn_no=txn_no).first() is not None
 
-    # Check if the user exists in the user table
-    user = session.query(User).filter_by(uid_user=uid_user).first()
-
-    # If the user does not exist, create a new user in the user table
-    if not user:
-        user = User(
+# Function to handle payment success when txn_no does not exist in payment_success table
+def handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan=None, note=None):
+    if not is_txn_no_exists(txn_no):
+        # Update the payment_success table
+        new_payment_success = PaymentSuccess(
+            invoice_amount=invoice_amount,
             uid_user=uid_user,
-            plan="Basic",  # Set the appropriate default plan
-            plan_started_time=datetime.utcnow(),  # Set the appropriate default plan start time
-            plan_ended_time=datetime.utcnow(),  # Set the appropriate default plan end time
-            credit=0  # Set the appropriate default credit
+            txn_no=txn_no,
         )
-        session.add(user)
+        session.add(new_payment_success)
 
-    # Update the credit and plan for the user
-    user.credit += invoice_amount
-    user.plan = "Premium"  # Set the appropriate plan based on the payment
-    user.plan_started_time = datetime.utcnow()  # Set the appropriate plan start time
-    user.plan_ended_time = datetime.utcnow()  # Set the appropriate plan end time
+        # Check if the user exists in the user table
+        user = session.query(User).filter_by(uid_user=uid_user).first()
 
-    # Update the credit_transfer table
-    new_credit_transfer = CreditTransfer(
-        credit=invoice_amount,
-        uid_user=uid_user,
-        note=note
-    )
-    session.add(new_credit_transfer)
+        # If the user does not exist, create a new user in the user table
+        if not user:
+            user = User(
+                uid_user=uid_user,
+                plan="Basic",  # Set the appropriate default plan
+                plan_started_time=datetime.utcnow(),  # Set the appropriate default plan start time
+                plan_ended_time=datetime.utcnow(),  # Set the appropriate default plan end time
+                credit=0  # Set the appropriate default credit
+            )
+            session.add(user)
 
-    # Commit the changes to the database
-    session.commit()
+        # Update the credit and plan for the user
+        user.credit += invoice_amount
+        if aggregated_plan:
+            user.plan = aggregated_plan
+        else:
+            user.plan = "Premium"  # Set the appropriate plan based on the payment
+        user.plan_started_time = datetime.utcnow()  # Set the appropriate plan start time
+        user.plan_ended_time = datetime.utcnow()  # Set the appropriate plan end time
 
+        # Update the credit_transfer table
+        new_credit_transfer = CreditTransfer(
+            credit=invoice_amount,
+            uid_user=uid_user,
+            note=note
+        )
+        session.add(new_credit_transfer)
+
+        # Commit the changes to the database
+        session.commit()
+
+
+session.close()
