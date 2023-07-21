@@ -14,6 +14,8 @@ from email_api import *
 tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
 tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
 
+coinbase_api_key = '9c99c9ad-29a9-4179-9a4a-e31514b7b391'
+
 app = FastAPI()
 security = HTTPBasic()
 # Allow all origins for demonstration purposes. Replace "*" with your specific origins.
