@@ -1,15 +1,13 @@
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
+from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime,Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 from enum import Enum
-
+from email_api import *
 # Replace "your_database_name.db" with the desired name for your SQLite database
 DATABASE_URL = "sqlite:///your_database_name.db"
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
-
-
 
 
 
@@ -23,6 +21,7 @@ class PaymentSuccess(Base):
     txn_no = Column(String, nullable=False, unique=True)
     time_created = Column(DateTime, default=datetime.utcnow)
     email = Column(String) 
+    email_sent = Column(Boolean, default=False) 
 
 
 # Define the "credit_transfer" table using the ORM approach
@@ -64,6 +63,18 @@ session = SessionLocal()
 def is_txn_no_exists(txn_no):
     return session.query(PaymentSuccess).filter_by(txn_no=txn_no).first() is not None
 
+
+def payment_success_callback(user_email, user_name, amount):
+    template_file = "payment_success_email_template.html"
+    subject = "Payment Successful"
+    context = {
+        "user_name": user_name,
+        "amount": amount
+    }
+
+    send_email2(user_email, subject, template_file, context)
+
+
 # Function to handle payment success when txn_no does not exist in payment_success table
 def handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan=None, note=None, email=None):
     if not is_txn_no_exists(txn_no):
@@ -72,10 +83,19 @@ def handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan=Non
             invoice_amount=invoice_amount,
             uid_user=uid_user,
             txn_no=txn_no,
-            email = email
+            email = email,
+            email_sent = True
         )
         session.add(new_payment_success)
+        # Send the email to the user
+        user_email = email
+        user_name = uid_user  # Get the user's name from the database or payment_data
+        amount = invoice_amount
 
+        # Call the function to send the email
+        payment_success_callback(user_email, user_name, amount)
+
+        # Update the email_sent flag to True in the database
         # Check if the user exists in the user table
         user = session.query(User).filter_by(uid_user=uid_user).first()
 
@@ -110,7 +130,7 @@ def handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan=Non
 
         # Commit the changes to the database
         session.commit()
-
+        
 def update_credit_and_record_transfer(user_id, credit_change, note):
     # Find the user in the database
     user = session.query(User).filter_by(uid_user=user_id).first()

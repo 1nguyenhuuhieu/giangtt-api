@@ -10,6 +10,17 @@ from database import *
 from email_api import *
 
 
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import smtplib
+
+
+
+# Your SMTP email configuration
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = "1nguyenhuuhieu@gmail.com"
+SENDER_PASSWORD = "qlwzbxcnfvceiwfb"
 
 tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
 tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
@@ -97,7 +108,6 @@ async def get_checkout(txn_no: str, api_key: str = Depends(verify_api_key)):
             note = f"Payment for {aggregated_plan} Plan subscription"
 
         handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan, note, email)
-
     return response
 
 
@@ -365,6 +375,26 @@ async def get_credit_transfer(
 
 
 
+@app.post("/api/send_email/")
+async def send_email(receiver_email: str, subject: str, body: str, api_key: str = Depends(verify_api_key)):
+    try:
+        # Prepare the email content
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = receiver_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        # Connect to the SMTP server and send the email
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
+        server.quit()
+
+        return {"message": "Email sent successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
 
 
 
