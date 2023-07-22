@@ -33,7 +33,7 @@ security = HTTPBasic()
 origins = ["*"]
 
 
-valid_api_keys = ["ee0e1e35-cdvn-3471-3xbv-ac73611ac1e2"]
+valid_api_keys = ["test-apikey-22072023"]
 
 app.add_middleware(
     CORSMiddleware,
