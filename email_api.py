@@ -1,7 +1,8 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
+from jinja2 import Environment, FileSystemLoader
+import os
 
 sender_email = "1nguyenhuuhieu@gmail.com"  # Replace with your sender email address
 sender_password = "qlwzbxcnfvceiwfb"  # Replace with your sender email password
@@ -81,6 +82,38 @@ def send_email(receiver_email, subject, message):
         server.starttls()
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, [receiver_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
+    
+
+def send_email2(receiver_email, subject, template_file, context):
+    # SMTP email configuration
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 587
+
+    # Load the template file
+    env = Environment(loader=FileSystemLoader(os.path.dirname(os.path.abspath(__file__))))
+    template = env.get_template(template_file)
+
+    # Render the template with the provided context
+    email_body = template.render(context)
+
+    # Prepare the email content
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(email_body, "html"))
+
+    try:
+        # Connect to the SMTP server and send the email
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
         server.quit()
         return True
     except Exception as e:
