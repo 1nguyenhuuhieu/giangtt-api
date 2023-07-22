@@ -34,13 +34,12 @@ security = HTTPBasic()
 origins = ["*"]
 
 
-valid_api_keys = ["test-apikey-22072023"]
 
 # Your actual API key (replace this with your API key)
-API_KEY = "your_actual_api_key"
+API_KEY = "test-apikey-22072023"
 
 # Custom API key header name
-API_KEY_NAME = "test-apikey-22072023"
+API_KEY_NAME = "API_KEY"
 
 
 app.add_middleware(
