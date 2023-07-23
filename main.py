@@ -71,10 +71,13 @@ async def validate_api_key(api_key: str = Depends(APIKeyHeader(name=API_KEY_NAME
         raise HTTPException(status_code=401, detail="Invalid API key")
     return True
 
+
+
+# api_key_validated: bool = Depends(validate_api_key)
+
 @app.post("/api/create_transaction/")
 async def create_transaction(
-    transaction: Transaction = Body(...),
-    api_key_validated: bool = Depends(validate_api_key)
+    transaction: Transaction = Body(...)
 ):
     # Process the logic to create a transaction and save it to the database
 
@@ -97,7 +100,7 @@ async def create_transaction(
 
 
 @app.get("/api/checkout/{txn_no}")
-async def get_checkout(txn_no: str, api_key_validated: bool = Depends(validate_api_key)):
+async def get_checkout(txn_no: str):
     # Perform logic to retrieve checkout details based on `txn_no`
     response = get_checkout_session(txn_no, tarzapay_api_Key, tarzapay_secret)
     if response['state'] == 'Payment_Received':
@@ -123,7 +126,7 @@ async def get_checkout(txn_no: str, api_key_validated: bool = Depends(validate_a
 
 # Assuming you have already defined the update_credit_and_record_transfer function
 @app.post("/api/create_user/")
-async def create_user(uid_user: str, email: str, api_key_validated: bool = Depends(validate_api_key)):
+async def create_user(uid_user: str, email: str):
     # Check if the user already exists in the database
     existing_user = SessionLocal().query(User).filter_by(uid_user=uid_user).first()
     if existing_user:
@@ -153,7 +156,7 @@ async def create_user(uid_user: str, email: str, api_key_validated: bool = Depen
     return {"status": "User created successfully.", "user_id": uid_user}
 
 @app.get("/api/check_generate/{user_id}/")
-async def check_generate(user_id: str, api_key_validated: bool = Depends(validate_api_key)):
+async def check_generate(user_id: str):
     # Query the user from the database based on the provided uid_user
     user = session.query(User).filter_by(uid_user=user_id).first()
 
@@ -176,7 +179,7 @@ async def check_generate(user_id: str, api_key_validated: bool = Depends(validat
         raise HTTPException(status_code=404, detail="User not found")
     
 @app.get("/api/generate_success/{user_id}/")
-async def generate_success(user_id: str, api_key_validated: bool = Depends(validate_api_key)):
+async def generate_success(user_id: str):
     # Query the user from the database based on the provided uid_user
     user = session.query(User).filter_by(uid_user=user_id).first()
 
@@ -205,7 +208,7 @@ async def generate_success(user_id: str, api_key_validated: bool = Depends(valid
 
 
 @app.get("/api/user/{user_id}/")
-async def get_user(user_id: str, api_key_validated: bool = Depends(validate_api_key)):
+async def get_user(user_id: str):
     # Query the user from the database based on the provided uid_user
     user = session.query(User).filter_by(uid_user=user_id).first()
 
@@ -222,7 +225,7 @@ async def get_user(user_id: str, api_key_validated: bool = Depends(validate_api_
     
 
 @app.get("/api/total_users/")
-async def get_total_users(api_key_validated: bool = Depends(validate_api_key)):
+async def get_total_users():
     # Query the total number of users from the database
     total_users = session.query(User).count()
 
@@ -230,7 +233,7 @@ async def get_total_users(api_key_validated: bool = Depends(validate_api_key)):
 
 
 @app.get("/api/get_users/")
-async def get_users(page: int = Query(1, ge=1), limit: int = Query(10, le=100), api_key_validated: bool = Depends(validate_api_key)):
+async def get_users(page: int = Query(1, ge=1), limit: int = Query(10, le=100)):
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
@@ -247,9 +250,7 @@ async def get_users(page: int = Query(1, ge=1), limit: int = Query(10, le=100), 
 @app.get("/api/payment_success/{user_id}/")
 async def get_user_payment_success(
     user_id: str,
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, le=100), api_key_validated: bool = Depends(validate_api_key)
-):
+    page: int = Query(1, ge=1)):
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
@@ -277,7 +278,7 @@ async def get_user_payment_success(
     
 
 @app.get("/api/total_payment_success/")
-async def get_total_payment_success(api_key_validated: bool = Depends(validate_api_key)):
+async def get_total_payment_success():
     # Query the total number of successful payment transactions from the database
     total_success = session.query(PaymentSuccess).count()
 
@@ -287,9 +288,7 @@ async def get_total_payment_success(api_key_validated: bool = Depends(validate_a
 @app.get("/api/payment_success/")
 async def get_payment_success(
     page: int = Query(1, ge=1),
-    limit: int = Query(10, le=100)
-    , api_key_validated: bool = Depends(validate_api_key)
-):
+    limit: int = Query(10, le=100)):
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
@@ -316,8 +315,7 @@ async def get_payment_success(
 async def get_user_credit_transfer(
     user_id: str,
     page: int = Query(1, ge=1),
-    limit: int = Query(10, le=100), api_key_validated: bool = Depends(validate_api_key)
-):
+    limit: int = Query(10, le=100)):
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
@@ -345,7 +343,7 @@ async def get_user_credit_transfer(
 
 
 @app.get("/api/total_credit_transfer/")
-async def get_total_credit_transfer(api_key_validated: bool = Depends(validate_api_key)):
+async def get_total_credit_transfer():
     # Query the total number of credit transfers from the database
     total_credit_transfer = session.query(CreditTransfer).count()
 
@@ -355,8 +353,7 @@ async def get_total_credit_transfer(api_key_validated: bool = Depends(validate_a
 @app.get("/api/credit_transfer/")
 async def get_credit_transfer(
     page: int = Query(1, ge=1),
-    limit: int = Query(10, le=100), api_key_validated: bool = Depends(validate_api_key)
-):
+    limit: int = Query(10, le=100)):
     # Calculate the offset based on the page and limit values
     offset = (page - 1) * limit
 
@@ -386,7 +383,7 @@ async def get_credit_transfer(
 
 
 @app.post("/api/send_email/")
-async def send_email(receiver_email: str, subject: str, body: str, api_key_validated: bool = Depends(validate_api_key)):
+async def send_email(receiver_email: str, subject: str, body: str):
     try:
         # Prepare the email content
         msg = MIMEMultipart()
@@ -406,9 +403,3 @@ async def send_email(receiver_email: str, subject: str, body: str, api_key_valid
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
 
-
-
-
-#2307-020710
-
-#ee0e1e35-cdvn-3471-3xbv-ac73611ac1e2
