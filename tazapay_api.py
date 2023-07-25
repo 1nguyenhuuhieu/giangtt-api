@@ -3,6 +3,8 @@ import base64
 import json
 
 # Tạo header Authorization với thông tin xác thực Basic
+
+
 def create_basic_auth_header(username, password):
     auth_string = f"{username}:{password}"
     encoded_auth_string = auth_string.encode("utf-8")
@@ -22,16 +24,10 @@ def create_checkout_session(payload, username, password):
     response_data = response.text
     data = json.loads(response_data)
 
-    email = data['data']['buyer']['email']
-    status = data['status']
-    message = data['message']
     redirect_url = data['data']['redirect_url']
     txn_no = data['data']['txn_no']
 
     response = {
-    "email": email,
-    "status": status,
-    "message": message,
     "redirect_url": redirect_url,
     "txn_no": txn_no
     }

@@ -3,7 +3,10 @@ from fastapi import FastAPI,Body, Depends, HTTPException, Query, Header
 from fastapi.security import HTTPBasic
 from pydantic import BaseModel, Field
 from fastapi.encoders import jsonable_encoder
-from tarzapay import *
+
+import tazapay_api
+import coinbase_api
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import *
@@ -27,8 +30,8 @@ SENDER_PASSWORD = "qlwzbxcnfvceiwfb"
 # config for payment gateway
 
 # tazapay
-tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
-tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
+tazapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
+tazapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
 
 #coinbase
 coinbase_api_key = '9c99c9ad-29a9-4179-9a4a-e31514b7b391'
@@ -37,9 +40,6 @@ coinbase_api_key = '9c99c9ad-29a9-4179-9a4a-e31514b7b391'
 
 app = FastAPI()
 security = HTTPBasic()
-# Allow all origins for demonstration purposes. Replace "*" with your specific origins.
-origins = ["*"]
-
 
 
 # Your actual API key (replace this with your API key)
@@ -49,6 +49,9 @@ API_KEY = "test-apikey-22072023"
 API_KEY_NAME = "API_KEY"
 
 
+
+# Allow all origins for demonstration purposes. Replace "*" with your specific origins.
+origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -56,6 +59,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class BuyerTazapay(BaseModel):
     ind_bus_type: str = Field("Individual")
@@ -105,58 +109,31 @@ async def create_tazapay_payment(
     # Process the logic to create a transaction and save it to the database
 
     transaction_json = jsonable_encoder(transaction)
-    response = create_checkout_session(transaction_json, tarzapay_api_Key, tarzapay_secret)
+    response = tazapay_api.create_checkout_session(transaction_json, tazapay_api_Key, tazapay_secret)
 
-    receiver_email = response['email']
+    receiver_email = transaction.buyer.email
     payment_link = response['redirect_url']
     
     send_payment_link(receiver_email, payment_link )
     
     return {
         "payment_link": payment_link,
-        "payment_id": transaction}
+        "payment_id": response['txn_no']}
+
 
 @app.post('/api/create_coinbase_payment/')
 async def create_coinbase_payment(item: CoinbasePayment):
-    headers = {
-        'Content-Type': 'application/json',
-        'X-CC-Api-Key': coinbase_api_key,
-        'X-CC-Version': '2018-03-22'
-    }
+    payment_url = coinbase_api.create_payment(item,coinbase_api_key)
 
-    payload = {
-        'name': item.email,
-        'description': item.description,
-        'local_price': {
-            'amount': str(item.amount),
-            'currency': item.currency
-        },
-        'pricing_type': 'fixed_price'
-    }
-
-    receiver_email = response['email']
-    payment_link = response['redirect_url']
-    
-    send_payment_link(receiver_email, payment_link )
-    
-    response = requests.post('https://api.commerce.coinbase.com/charges/', headers=headers, data=json.dumps(payload))
-
-    if response.status_code == 201:
-        response_data = response.json()
-        payment_url = response_data['data']['hosted_url']
+    if payment_url is not None:
         return {'Payment URL': payment_url}
     else:
         raise HTTPException(status_code=400, detail="Payment creation failed")
-
-
-    return {
-        "payment": response,
-        "transaction": transaction}
     
-@app.get("/api/checkout/{txn_no}")
+@app.get("/api/checkout_tazapay/{txn_no}")
 async def get_checkout(txn_no: str):
     # Perform logic to retrieve checkout details based on `txn_no`
-    response = get_checkout_session(txn_no, tarzapay_api_Key, tarzapay_secret)
+    response = tazapay_api.get_checkout_session(txn_no, tazapay_api_Key, tazapay_secret)
     if response['state'] == 'Payment_Received':
         txn_no = response['txn_no']
         email = response['email']
@@ -176,6 +153,16 @@ async def get_checkout(txn_no: str):
 
         handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan, note, email)
     return response
+
+
+@app.get("/api/checkout_coinbase/{charge_id}")
+async def get_checkout_coinbase(charge_id: str):
+    # Perform logic to retrieve checkout details based on `txn_no`
+    response = coinbase_api.get_charge(charge_id, coinbase_api_key)
+   
+    return response
+
+
 
 
 # Assuming you have already defined the update_credit_and_record_transfer function
