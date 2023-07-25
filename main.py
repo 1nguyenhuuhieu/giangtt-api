@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fastapi import FastAPI,Body, Depends, HTTPException, Query
+from fastapi import FastAPI,Body, Depends, HTTPException, Query, Header
 from fastapi.security import HTTPBasic
 from pydantic import BaseModel, Field
 from fastapi.encoders import jsonable_encoder
@@ -23,10 +23,17 @@ SMTP_PORT = 587
 SENDER_EMAIL = "1nguyenhuuhieu@gmail.com"
 SENDER_PASSWORD = "qlwzbxcnfvceiwfb"
 
+
+# config for payment gateway
+
+# tazapay
 tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
 tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
 
+#coinbase
 coinbase_api_key = '9c99c9ad-29a9-4179-9a4a-e31514b7b391'
+
+
 
 app = FastAPI()
 security = HTTPBasic()
@@ -50,19 +57,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class Buyer(BaseModel):
+class BuyerTazapay(BaseModel):
     ind_bus_type: str = Field("Individual")
     email: str
     country: str
     first_name: str
     last_name: str
 
-class Transaction(BaseModel):
-    buyer: Buyer
+class TazapayPayment(BaseModel):
+    buyer: BuyerTazapay
     invoice_currency: str = Field("USD")
     invoice_amount: float
     txn_description: str
 
+class CoinbasePayment(BaseModel):
+    email: str
+    description: str
+    amount: float
+    currency: str = Field("USD")
+    
+
+# Request model for credit transfer
+class CreditTransferRequest(BaseModel):
+    credit: float
+    uid_user: str
+    note: str
+    
 # Custom dependency to validate the API key
 async def validate_api_key(api_key: str = Depends(APIKeyHeader(name=API_KEY_NAME))):
     # Validate the API key (you may use other validation methods as needed)
@@ -75,30 +95,64 @@ async def validate_api_key(api_key: str = Depends(APIKeyHeader(name=API_KEY_NAME
 
 # api_key_validated: bool = Depends(validate_api_key)
 
-@app.post("/api/create_transaction/")
-async def create_transaction(
-    transaction: Transaction = Body(...)
-):
+
+def send_payment_link(email, payment_link):
+    pass
+    
+@app.post("/api/create_tazapay_payment/")
+async def create_tazapay_payment(
+    transaction: TazapayPayment = Body(...)):
     # Process the logic to create a transaction and save it to the database
 
     transaction_json = jsonable_encoder(transaction)
     response = create_checkout_session(transaction_json, tarzapay_api_Key, tarzapay_secret)
 
     receiver_email = response['email']
-    subject = "Guide for Tazapay Transaction"
     payment_link = response['redirect_url']
-    # Generate the HTML content with the payment link
-    html_content = generate_html_content(payment_link)
     
-    # Send the email
-    send_html_email(receiver_email, subject, html_content)
+    send_payment_link(receiver_email, payment_link )
+    
+    return {
+        "payment_link": payment_link,
+        "payment_id": transaction}
+
+@app.post('/api/create_coinbase_payment/')
+async def create_coinbase_payment(item: CoinbasePayment):
+    headers = {
+        'Content-Type': 'application/json',
+        'X-CC-Api-Key': coinbase_api_key,
+        'X-CC-Version': '2018-03-22'
+    }
+
+    payload = {
+        'name': item.email,
+        'description': item.description,
+        'local_price': {
+            'amount': str(item.amount),
+            'currency': item.currency
+        },
+        'pricing_type': 'fixed_price'
+    }
+
+    receiver_email = response['email']
+    payment_link = response['redirect_url']
+    
+    send_payment_link(receiver_email, payment_link )
+    
+    response = requests.post('https://api.commerce.coinbase.com/charges/', headers=headers, data=json.dumps(payload))
+
+    if response.status_code == 201:
+        response_data = response.json()
+        payment_url = response_data['data']['hosted_url']
+        return {'Payment URL': payment_url}
+    else:
+        raise HTTPException(status_code=400, detail="Payment creation failed")
 
 
     return {
         "payment": response,
         "transaction": transaction}
-
-
+    
 @app.get("/api/checkout/{txn_no}")
 async def get_checkout(txn_no: str):
     # Perform logic to retrieve checkout details based on `txn_no`
@@ -149,11 +203,39 @@ async def create_user(uid_user: str, email: str):
     )
     session.add(credit_transfer)
     session.add(new_user)
-
-    
     session.commit()
 
     return {"status": "User created successfully.", "user_id": uid_user}
+
+
+@app.post("/api/create_credit_transfer/")
+def credit_transfer(credit_transfer_request: CreditTransferRequest):
+    # Process the credit transfer request
+    try:
+        # Start a new database session
+        db = SessionLocal()
+
+        # Create a new CreditTransfer instance
+        credit_transfer = CreditTransfer(
+            credit=credit_transfer_request.credit,
+            uid_user=credit_transfer_request.uid_user,
+            note=credit_transfer_request.note
+        )
+
+        # Add the credit transfer record to the database
+        db.add(credit_transfer)
+        db.commit()
+        db.refresh(credit_transfer)
+
+        return {"message": "Credit transfer successful.", "credit_transfer": credit_transfer}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Credit transfer failed: {e}")
+    finally:
+        # Close the database session
+        db.close()
+
+
 
 @app.get("/api/check_generate/{user_id}/")
 async def check_generate(user_id: str):
@@ -311,7 +393,7 @@ async def get_payment_success(
     
 
 
-@app.get("/api/credit_transfer/{user_id}/")
+@app.get("/api/get_credit_transfer/{user_id}/")
 async def get_user_credit_transfer(
     user_id: str,
     page: int = Query(1, ge=1),
@@ -350,7 +432,7 @@ async def get_total_credit_transfer():
     return {"total_credit_transfer": total_credit_transfer}
 
 
-@app.get("/api/credit_transfer/")
+@app.get("/api/get_credit_transfer/")
 async def get_credit_transfer(
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100)):
