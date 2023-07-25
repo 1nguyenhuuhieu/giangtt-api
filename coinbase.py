@@ -26,5 +26,7 @@ if response.status_code == 201:
     print(f'Success: {response_data}')
     payment_url = response_data['data']['hosted_url']
     print(f'Payment URL: {payment_url}')
+    charge_code = response_data['data']['code']
+    print(f'charge_code: {charge_code}')
 else:
     print(f'Error: {response.content}')
