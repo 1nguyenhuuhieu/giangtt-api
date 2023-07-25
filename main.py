@@ -63,6 +63,13 @@ class Transaction(BaseModel):
     invoice_amount: float
     txn_description: str
 
+
+# Request model for credit transfer
+class CreditTransferRequest(BaseModel):
+    credit: float
+    uid_user: str
+    note: str
+    
 # Custom dependency to validate the API key
 async def validate_api_key(api_key: str = Depends(APIKeyHeader(name=API_KEY_NAME))):
     # Validate the API key (you may use other validation methods as needed)
@@ -154,6 +161,36 @@ async def create_user(uid_user: str, email: str):
     session.commit()
 
     return {"status": "User created successfully.", "user_id": uid_user}
+
+
+@app.post("/api/create_credit_transfer/")
+def credit_transfer(credit_transfer_request: CreditTransferRequest):
+    # Process the credit transfer request
+    try:
+        # Start a new database session
+        db = SessionLocal()
+
+        # Create a new CreditTransfer instance
+        credit_transfer = CreditTransfer(
+            credit=credit_transfer_request.credit,
+            uid_user=credit_transfer_request.uid_user,
+            note=credit_transfer_request.note
+        )
+
+        # Add the credit transfer record to the database
+        db.add(credit_transfer)
+        db.commit()
+        db.refresh(credit_transfer)
+
+        return {"message": "Credit transfer successful.", "credit_transfer": credit_transfer}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Credit transfer failed: {e}")
+    finally:
+        # Close the database session
+        db.close()
+
+
 
 @app.get("/api/check_generate/{user_id}/")
 async def check_generate(user_id: str):
@@ -311,7 +348,7 @@ async def get_payment_success(
     
 
 
-@app.get("/api/credit_transfer/{user_id}/")
+@app.get("/api/get_credit_transfer/{user_id}/")
 async def get_user_credit_transfer(
     user_id: str,
     page: int = Query(1, ge=1),
@@ -350,7 +387,7 @@ async def get_total_credit_transfer():
     return {"total_credit_transfer": total_credit_transfer}
 
 
-@app.get("/api/credit_transfer/")
+@app.get("/api/get_credit_transfer/")
 async def get_credit_transfer(
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100)):
