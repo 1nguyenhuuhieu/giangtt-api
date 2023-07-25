@@ -23,10 +23,17 @@ SMTP_PORT = 587
 SENDER_EMAIL = "1nguyenhuuhieu@gmail.com"
 SENDER_PASSWORD = "qlwzbxcnfvceiwfb"
 
+
+# config for payment gateway
+
+# tazapay
 tarzapay_api_Key = 'GSLL9GDA84URSS7TSA2Z'
 tarzapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4dVUmFlY0M8otDUyAxBw8AoSLObmkvZEtL5Aq70U7IPAgKddMy7bU7vIx4SWokkcVfI9CI4pWXB'
 
+#coinbase
 coinbase_api_key = '9c99c9ad-29a9-4179-9a4a-e31514b7b391'
+
+
 
 app = FastAPI()
 security = HTTPBasic()
@@ -64,10 +71,10 @@ class TazapayPayment(BaseModel):
     txn_description: str
 
 class CoinbasePayment(BaseModel):
-    name: str
+    email: str
     description: str
     amount: float
-    currency: str
+    currency: str = Field("USD")
     
 
 # Request model for credit transfer
@@ -88,28 +95,26 @@ async def validate_api_key(api_key: str = Depends(APIKeyHeader(name=API_KEY_NAME
 
 # api_key_validated: bool = Depends(validate_api_key)
 
+
+def send_payment_link(email, payment_link):
+    pass
+    
 @app.post("/api/create_tazapay_payment/")
 async def create_tazapay_payment(
-    transaction: TazapayPayment = Body(...)
-):
+    transaction: TazapayPayment = Body(...)):
     # Process the logic to create a transaction and save it to the database
 
     transaction_json = jsonable_encoder(transaction)
     response = create_checkout_session(transaction_json, tarzapay_api_Key, tarzapay_secret)
 
     receiver_email = response['email']
-    subject = "Guide for Tazapay Transaction"
     payment_link = response['redirect_url']
-    # Generate the HTML content with the payment link
-    html_content = generate_html_content(payment_link)
     
-    # Send the email
-    send_html_email(receiver_email, subject, html_content)
-
-
+    send_payment_link(receiver_email, payment_link )
+    
     return {
-        "payment": response,
-        "transaction": transaction}
+        "payment_link": payment_link,
+        "payment_id": transaction}
 
 @app.post('/api/create_coinbase_payment/')
 async def create_coinbase_payment(item: CoinbasePayment):
@@ -120,7 +125,7 @@ async def create_coinbase_payment(item: CoinbasePayment):
     }
 
     payload = {
-        'name': item.name,
+        'name': item.email,
         'description': item.description,
         'local_price': {
             'amount': str(item.amount),
@@ -129,6 +134,11 @@ async def create_coinbase_payment(item: CoinbasePayment):
         'pricing_type': 'fixed_price'
     }
 
+    receiver_email = response['email']
+    payment_link = response['redirect_url']
+    
+    send_payment_link(receiver_email, payment_link )
+    
     response = requests.post('https://api.commerce.coinbase.com/charges/', headers=headers, data=json.dumps(payload))
 
     if response.status_code == 201:
@@ -137,6 +147,11 @@ async def create_coinbase_payment(item: CoinbasePayment):
         return {'Payment URL': payment_url}
     else:
         raise HTTPException(status_code=400, detail="Payment creation failed")
+
+
+    return {
+        "payment": response,
+        "transaction": transaction}
     
 @app.get("/api/checkout/{txn_no}")
 async def get_checkout(txn_no: str):
