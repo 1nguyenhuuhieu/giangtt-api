@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fastapi import FastAPI,Body, Depends, HTTPException, Query
+from fastapi import FastAPI,Body, Depends, HTTPException, Query, Header
 from fastapi.security import HTTPBasic
 from pydantic import BaseModel, Field
 from fastapi.encoders import jsonable_encoder
@@ -50,19 +50,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class Buyer(BaseModel):
+class BuyerTazapay(BaseModel):
     ind_bus_type: str = Field("Individual")
     email: str
     country: str
     first_name: str
     last_name: str
 
-class Transaction(BaseModel):
-    buyer: Buyer
+class TazapayPayment(BaseModel):
+    buyer: BuyerTazapay
     invoice_currency: str = Field("USD")
     invoice_amount: float
     txn_description: str
 
+class CoinbasePayment(BaseModel):
+    name: str
+    description: str
+    amount: float
+    currency: str
+    
 
 # Request model for credit transfer
 class CreditTransferRequest(BaseModel):
@@ -82,9 +88,9 @@ async def validate_api_key(api_key: str = Depends(APIKeyHeader(name=API_KEY_NAME
 
 # api_key_validated: bool = Depends(validate_api_key)
 
-@app.post("/api/create_transaction/")
-async def create_transaction(
-    transaction: Transaction = Body(...)
+@app.post("/api/create_tazapay_payment/")
+async def create_tazapay_payment(
+    transaction: TazapayPayment = Body(...)
 ):
     # Process the logic to create a transaction and save it to the database
 
@@ -105,7 +111,33 @@ async def create_transaction(
         "payment": response,
         "transaction": transaction}
 
+@app.post('/api/create_coinbase_payment/')
+async def create_coinbase_payment(item: CoinbasePayment):
+    headers = {
+        'Content-Type': 'application/json',
+        'X-CC-Api-Key': coinbase_api_key,
+        'X-CC-Version': '2018-03-22'
+    }
 
+    payload = {
+        'name': item.name,
+        'description': item.description,
+        'local_price': {
+            'amount': str(item.amount),
+            'currency': item.currency
+        },
+        'pricing_type': 'fixed_price'
+    }
+
+    response = requests.post('https://api.commerce.coinbase.com/charges/', headers=headers, data=json.dumps(payload))
+
+    if response.status_code == 201:
+        response_data = response.json()
+        payment_url = response_data['data']['hosted_url']
+        return {'Payment URL': payment_url}
+    else:
+        raise HTTPException(status_code=400, detail="Payment creation failed")
+    
 @app.get("/api/checkout/{txn_no}")
 async def get_checkout(txn_no: str):
     # Perform logic to retrieve checkout details based on `txn_no`
@@ -156,8 +188,6 @@ async def create_user(uid_user: str, email: str):
     )
     session.add(credit_transfer)
     session.add(new_user)
-
-    
     session.commit()
 
     return {"status": "User created successfully.", "user_id": uid_user}
