@@ -20,6 +20,8 @@ import smtplib
 from fastapi.security.api_key import APIKeyHeader
 from hashlib import sha256
 
+
+# Load config
 # Your SMTP email configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -36,17 +38,17 @@ tazapay_secret = 'sandbox_gPIMe0IIIxd7x3HHVBpUPki32eNV8AC84lByYTNaD7JDgGpIMZRZa4
 #coinbase
 coinbase_api_key = '9c99c9ad-29a9-4179-9a4a-e31514b7b391'
 
-
-
-app = FastAPI()
-security = HTTPBasic()
-
-
 # Your actual API key (replace this with your API key)
 API_KEY = "test-apikey-22072023"
 
 # Custom API key header name
 API_KEY_NAME = "API_KEY"
+
+
+
+app = FastAPI()
+security = HTTPBasic()
+
 
 
 
@@ -74,6 +76,14 @@ class TazapayPayment(BaseModel):
     invoice_amount: float
     txn_description: str
 
+
+class TransactionTazapayData(BaseModel):
+    txn_no: str
+
+class CallbackTazapayData(BaseModel):
+    status: str
+    data: TransactionTazapayData
+    
 class CoinbasePayment(BaseModel):
     email: str
     description: str
@@ -129,11 +139,14 @@ async def create_coinbase_payment(item: CoinbasePayment):
         return {'Payment URL': payment_url}
     else:
         raise HTTPException(status_code=400, detail="Payment creation failed")
-    
-@app.get("/api/checkout_tazapay/{txn_no}")
-async def get_checkout(txn_no: str):
-    # Perform logic to retrieve checkout details based on `txn_no`
+
+
+@app.post("/api/tazapay_callback/")
+async def tazapay_callback(data: CallbackTazapayData):
+    # Here you can access the txn_no value
+    txn_no = data.data.txn_no
     response = tazapay_api.get_checkout_session(txn_no, tazapay_api_Key, tazapay_secret)
+
     if response['state'] == 'Payment_Received':
         txn_no = response['txn_no']
         email = response['email']
@@ -151,9 +164,8 @@ async def get_checkout(txn_no: str):
         else:
             note = f"Payment for {aggregated_plan} Plan subscription"
 
-        handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan, note, email)
+        handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan, note, email, 'Tazapay')
     return response
-
 
 @app.get("/api/checkout_coinbase/{charge_id}")
 async def get_checkout_coinbase(charge_id: str):
@@ -161,9 +173,6 @@ async def get_checkout_coinbase(charge_id: str):
     response = coinbase_api.get_charge(charge_id, coinbase_api_key)
    
     return response
-
-
-
 
 # Assuming you have already defined the update_credit_and_record_transfer function
 @app.post("/api/create_user/")

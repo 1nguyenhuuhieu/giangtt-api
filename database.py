@@ -19,6 +19,7 @@ class PaymentSuccess(Base):
     invoice_amount = Column(Float, nullable=False)
     uid_user = Column(String, nullable=False)
     txn_no = Column(String, nullable=False, unique=True)
+    payment_gateway = Column(String)
     time_created = Column(DateTime, default=datetime.utcnow)
     email = Column(String) 
     email_sent = Column(Boolean, default=False) 
@@ -76,13 +77,14 @@ def payment_success_callback(user_email, user_name, amount):
 
 
 # Function to handle payment success when txn_no does not exist in payment_success table
-def handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan=None, note=None, email=None):
+def handle_payment_success(uid_user, invoice_amount, txn_no, aggregated_plan=None, note=None, email=None, payment_gateway):
     if not is_txn_no_exists(txn_no):
         # Update the payment_success table
         new_payment_success = PaymentSuccess(
             invoice_amount=invoice_amount,
             uid_user=uid_user,
             txn_no=txn_no,
+            payment_gateway = payment_gateway,
             email = email,
             email_sent = True
         )

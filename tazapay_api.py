@@ -20,18 +20,22 @@ def create_checkout_session(payload, username, password):
     url = "https://api-sandbox.tazapay.com/v1/checkout"
     headers = create_basic_auth_header(username, password)
     response = requests.post(url, json=payload, headers=headers)
+    
+    if response.status_code == 200:
 
-    response_data = response.text
-    data = json.loads(response_data)
+        response_data = response.text
+        data = json.loads(response_data)
 
-    redirect_url = data['data']['redirect_url']
-    txn_no = data['data']['txn_no']
+        redirect_url = data['data']['redirect_url']
+        txn_no = data['data']['txn_no']
 
-    response = {
-    "redirect_url": redirect_url,
-    "txn_no": txn_no
-    }
-    return response
+        response = {
+        "redirect_url": redirect_url,
+        "txn_no": txn_no
+        }
+        return response
+    
+    return None
 
 # Kiểm tra thông tin thanh toán
 def get_checkout_session(txn_no, username, password):
